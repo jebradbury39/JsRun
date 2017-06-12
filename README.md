@@ -1,0 +1,1 @@
+A JavaScript interpreter written in...JavaScript. Why? Because why not.
