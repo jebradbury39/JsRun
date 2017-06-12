@@ -10,19 +10,22 @@ class Interpreter {
       this.contextObj = {}; //"this"
    }
    
-   extend() {
-      return new Interpreter(this);
+   extend(scopedVars) {
+      var inter = new Interpreter(this);
+      for (var k in scopedVars) {
+         if (!(k in inter.vars)) {
+            inter.vars[k] = scopedVars[k];
+         }
+      }
+      return inter;
    }
    
-   //since lower scopes get wiped out, we need to update the top scope var
    lookupVarScope(name) {
       var scope = this;
-      var scopes = [scope]; //return all the scopes we need to update
       while (scope) {
          if (Object.prototype.hasOwnProperty.call(scope.vars, name)) {
-            return scopes;
+            return scope;
          }
-         scopes.push(scope);
          scope = scope.parent;
       }
       return null;
@@ -33,13 +36,13 @@ class Interpreter {
          return this.contextObj;
       }
       
-      var scopes = this.lookupVarScope(name);
-      if (!scopes) {
+      var scope = this.lookupVarScope(name);
+      if (!scope) {
          throw new Error("Undefined variable: " + JSON.stringify(name));
       }
       
       //we only care about top scope value
-      return scopes[scopes.length - 1].vars[name];
+      return scope.vars[name];
    }
    
    setVar(name, value) {
@@ -48,14 +51,12 @@ class Interpreter {
          return undefined;
       }
       
-      var scopes = this.lookupVarScope(name);
-      if (!scopes) {
+      var scope = this.lookupVarScope(name);
+      if (!scope) {
          throw new Error("Undefined variable: " + JSON.stringify(name));
       }
       
-      for (var s in scopes) {
-         scopes[s].vars[name] = value;
-      }
+      scope.vars[name] = value;
       return undefined;
    }
    

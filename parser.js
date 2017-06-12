@@ -143,7 +143,7 @@ class BinaryOpNode extends AST_Node {
       
       if (this.op === ".") {
          //access property right of object left
-         return new ReturnObj(BASIC, this.right.visitObj(this.left.visit(env).value).value);
+         return new ReturnObj(BASIC, this.right.visitObj(env, this.left.visit(env).value).value);
       }
       if (this.op === ":") {
          //creation of object
@@ -280,7 +280,7 @@ class IdentifierNode extends AST_Node {
       return new ReturnObj(BASIC, env.getVar(this.op));
    }
    
-   visitObj(obj) {
+   visitObj(env, obj) {
       return new ReturnObj(BASIC, obj[this.op]);
    }
 }
@@ -377,6 +377,8 @@ class FunctionDeclarationNode extends AST_Node {
       }
       
       this.vars = new IdentifierDeclarationNode("var", this.vars);
+      
+      this.scopedVars = {}; //for if we are declared inside another function
    }
    
    addArgument(node) {
@@ -391,11 +393,12 @@ class FunctionDeclarationNode extends AST_Node {
       if (!this.isAnon) {
          env.defineVar(this.op, this);
       }
+      this.scopedVars = env.vars;
       return new ReturnObj(BASIC, this);
    }
    
    execute(env, args) {
-      var scope = env.extend();
+      var scope = env.extend(this.scopedVars);
       var result;
       
       //init scope with arguments
@@ -436,6 +439,21 @@ class FunctionCallNode extends AST_Node {
       this.vars.push(node);
    }
    
+   visitObj(env, obj) {
+      var fn = obj[this.value.op];
+      if (fn.type !== "FunctionDeclarationNode") {
+         throw new Error(this.value.op + " is not a function");
+      }
+      
+      //get child values
+      var args = [];
+      for (var i = 0; i < this.vars.length; i++) {
+         args.push(this.vars[i].visit(env).value);
+      }
+      
+		return fn.execute(env, args);
+   }
+   
    visit(env) {
       switch (this.value.op) {
          case "print":
@@ -452,7 +470,6 @@ class FunctionCallNode extends AST_Node {
       
       var fn = env.getVar(this.value.op);
       if (fn.type !== "FunctionDeclarationNode") {
-         console.log(fn);
          throw new Error(this.value.op + " is not a function");
       }
       
