@@ -175,6 +175,8 @@ var TokenTypes = {
    "}": PUNCTUATOR,
    "(": PUNCTUATOR,
    ")": PUNCTUATOR,
+   "[": PUNCTUATOR,
+   "]": PUNCTUATOR,
    //keywords
    "break": KEYWORD,
    "case": KEYWORD,
@@ -247,7 +249,7 @@ function isWhitespace(c) {
 //some may be up to 3 digits, but we only need to verify the first character
 function isArithmeticOperator(c) {
    var ops = ["+", "/", "*", "%", "=", "<", ">", "|", "&", "!", "^", "~",
-      "(", ")", "{", "}", ";", "\"", ","];
+      "(", ")", "{", "}", ";", "\"", ",", "[", "]"];
    for (var i = 0; i < ops.length; i++) {
       if (ops[i] === c) {
          return true;

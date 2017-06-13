@@ -35,6 +35,12 @@ class Interpreter {
       if (name === "this") {
          return this.contextObj;
       }
+      if (name === "Math") {
+         return Math;
+      }
+      if (name === "Object") {
+         return Object;
+      }
       
       var scope = this.lookupVarScope(name);
       if (!scope) {

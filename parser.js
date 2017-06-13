@@ -28,10 +28,6 @@ class ProgramNode extends AST_Node {
 		this.children = children;
 	}
 	
-	addChild(node) {
-		this.children.push(node);
-	}
-	
 	visit(env) {
 		//iterate through children right to left
       var result = new ReturnObj(RETURN, undefined);
@@ -314,6 +310,23 @@ class BooleanNode extends AST_Node {
    }
 }
 
+class InitArrayNode extends AST_Node {
+   //op is our token from the lexer
+   constructor(elements) {
+      super("array_init");
+      this.type = "InitArrayNode";
+      this.elements = elements;
+   }
+   
+   visit(env) {
+      var arr = [];
+      for (var i = 0; i < this.elements.length; i++) {
+         arr.push(this.elements[i].visit(env));
+      }
+      return new ReturnObj(BASIC, arr);
+   }
+}
+
 //for functions, there may be 0 - n return statements
 //use a return node to exit
 
@@ -381,14 +394,6 @@ class FunctionDeclarationNode extends AST_Node {
       this.scopedVars = {}; //for if we are declared inside another function
    }
    
-   addArgument(node) {
-      this.vars.push(node);
-   }
-   
-   addChild(node) {
-		this.children.push(node);
-	}
-   
    visit(env) {
       if (!this.isAnon) {
          env.defineVar(this.op, this);
@@ -433,10 +438,6 @@ class FunctionCallNode extends AST_Node {
       this.type = "FunctionCallNode";
       this.value = fname; //function name
       this.vars = args; //arguments
-   }
-   
-   addChild(node) {
-      this.vars.push(node);
    }
    
    visitObj(env, obj) {
@@ -582,6 +583,7 @@ class LoopForNode extends AST_Node {
 class LoopWhileNode extends AST_Node {
    constructor(cond, body) {
       super("while");
+      this.type = "LoopWhileNode";
       this.cond = cond;
       this.body = body;
    }
@@ -607,6 +609,7 @@ class LoopWhileNode extends AST_Node {
 class LoopDoWhileNode extends AST_Node {
    constructor(cond, body) {
       super("while");
+      this.type = "LoopDoWhileNode";
       this.cond = cond;
       this.body = body;
    }
@@ -632,6 +635,7 @@ class LoopDoWhileNode extends AST_Node {
 class NewNode extends AST_Node {
    constructor(constructorFn) {
       super("new");
+      this.type = "NewNode";
       this.constructorFn = constructorFn;
    }
    
@@ -643,6 +647,7 @@ class NewNode extends AST_Node {
 class ArrayIndexNode extends AST_Node {
    constructor(value, left) {
       super("array_index");
+      this.type = "ArrayIndexNode";
       this.value = value;
       this.left = left;
    }
@@ -784,7 +789,30 @@ class Parser {
    
    parseIfFunctionCall(self, exprFn) {
       var expr = exprFn(self);
-      return self.lexerStream.peek().value === "(" ? self.parseFunctionCall(self, expr) : expr;
+      if (self.lexerStream.peek().value === "(") {
+         return self.parseFunctionCall(self, expr);
+      } else if (self.lexerStream.peek().value === "[") {
+         return self.parseArrayNotation(self, expr);
+      }
+      return expr;
+   }
+   
+   parseArrayNotation(self, prev) {
+      var expr;
+      //this can signal a new array or an indexing.
+      //is indexing if after identifier, function call, or array index
+      if (prev) {
+         if (prev.type === "IdentifierNode" || prev.type === "FunctionCallNode" || prev.type === "ArrayIndexNode") {
+            //is indexing, only one element
+            self.skipTokenValue(self, "[");
+            expr = self.parseExpression(self);
+            self.skipTokenValue(self, "]");
+            return new ArrayIndexNode(expr, prev);
+         }
+      }
+      //is new array, with 0+ elements
+      expr = self.parseDelimited(self, "[", "]", ",", [1, 1, 1], self.parseExpression);
+      return new InitArrayNode(expr);
    }
    
    parseSwitch(self) {
@@ -920,10 +948,16 @@ class Parser {
             self.currentToken = self.lexerStream.next(); //consume "next"
             return new NewNode(self.parseStatement(self));
          }
+         if (next === "[") {
+            return self.parseArrayNotation(self, null);
+         }
          
          self.currentToken = self.lexerStream.next();
          var token = self.currentToken;
          
+         if (token.value === "undefined") {
+            return new UndefinedNode();
+         }
          if (token.type === IDENTIFIER || token.value === "this") {
             if (self.lexerStream.peek().type === UNARY_OP) {
                //then we are dealing with x++ or x--
